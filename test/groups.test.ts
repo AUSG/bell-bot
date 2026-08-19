@@ -210,7 +210,17 @@ describe("command messages", () => {
       { type: "mention_group", groupName: "행사 TF" },
       env.DB,
     );
-    expect(message.text).toBe("🔔 행사 TF\n\n<@U123ABC> <@U456DEF>");
+    expect(message.text).toBe("🔔 행사 TF — <@U123ABC> <@U456DEF>");
+    expect(message.visibility).toBe("channel");
+    expect(message.blocks).toEqual([
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: ":bell: *행사 TF* — <@U123ABC> <@U456DEF>",
+        },
+      },
+    ]);
   });
 
   it("renders a member list with its count", async () => {
@@ -220,6 +230,7 @@ describe("command messages", () => {
       env.DB,
     );
     expect(message.text).toBe("🔔 11기 운영진 · 1명\n\n<@U123ABC>");
+    expect(message.visibility).toBe("ephemeral");
   });
 
   it("explains when a group does not exist", async () => {
@@ -228,6 +239,7 @@ describe("command messages", () => {
       env.DB,
     );
     expect(message.text).toContain("`100기 운영진` 그룹을 찾지 못했어요");
+    expect(message.visibility).toBe("ephemeral");
   });
 
   it("handles an empty group", async () => {
@@ -237,6 +249,7 @@ describe("command messages", () => {
       env.DB,
     );
     expect(message.text).toBe("🔔 빈 그룹에는 아직 등록된 멤버가 없어요.");
+    expect(message.visibility).toBe("ephemeral");
   });
 
   it("lists all groups and member counts", async () => {
@@ -245,6 +258,7 @@ describe("command messages", () => {
     const message = await buildCommandMessage({ type: "list_groups" }, env.DB);
     expect(message.text).toContain("• 10기 운영진 — 2명");
     expect(message.text).toContain("• 회장단 — 1명");
+    expect(message.visibility).toBe("ephemeral");
   });
 
   it("escapes a group name in Slack's mrkdwn fallback without escaping member mentions", async () => {
@@ -255,7 +269,7 @@ describe("command messages", () => {
     );
 
     expect(message.text).toBe(
-      "🔔 &lt;!channel&gt; &amp; 운영진\n\n<@U123ABC>",
+      "🔔 &lt;!channel&gt; &amp; 운영진 — <@U123ABC>",
     );
   });
 });

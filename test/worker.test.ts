@@ -37,7 +37,12 @@ describe("Worker routing and Slack authentication", () => {
   it("acknowledges an Events API retry without processing it again", async () => {
     const body = JSON.stringify({
       type: "event_callback",
-      event: { type: "app_mention", channel: "C123ABC", text: "<@U123ABC> 목록" },
+      event: {
+        type: "app_mention",
+        channel: "C123ABC",
+        user: "U123ABC",
+        text: "<@U123ABC> 목록",
+      },
     });
     const response = await signedFetch("/slack/events", body, "application/json", {
       "X-Slack-Retry-Num": "1",
@@ -60,6 +65,7 @@ describe("Worker routing and Slack authentication", () => {
       event: {
         type: "app_mention",
         channel: "C123ABC",
+        user: "U789GHI",
         text: "<@U999BOT> 행사 TF",
       },
     });
@@ -82,7 +88,51 @@ describe("Worker routing and Slack authentication", () => {
     const payload = parseRequestBody(init);
     expect(payload).toMatchObject({
       channel: "C123ABC",
-      text: "🔔 행사 TF\n\n<@U123ABC> <@U456DEF>",
+      text: "🔔 행사 TF — <@U123ABC> <@U456DEF>",
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: ":bell: *행사 TF* — <@U123ABC> <@U456DEF>",
+          },
+        },
+      ],
+    });
+  });
+
+  it("shows group lists only to the member who requested them", async () => {
+    await createGroup(env.DB, "행사 TF", ["U123ABC"]);
+    const slackFetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response('{"ok":true}', { status: 200 }));
+    const body = JSON.stringify({
+      type: "event_callback",
+      event: {
+        type: "app_mention",
+        channel: "C123ABC",
+        user: "U789GHI",
+        text: "<@U999BOT> 목록",
+      },
+    });
+    const ctx = createExecutionContext();
+    const request = await signedRequest("/slack/events", body, "application/json");
+
+    const response = await worker.fetch(
+      request as Parameters<typeof worker.fetch>[0],
+      env,
+      ctx,
+    );
+    expect(response.status).toBe(200);
+    await waitOnExecutionContext(ctx);
+
+    expect(slackFetch).toHaveBeenCalledTimes(1);
+    expect(slackFetch.mock.calls[0]?.[0]).toBe(
+      "https://slack.com/api/chat.postEphemeral",
+    );
+    expect(parseRequestBody(slackFetch.mock.calls[0]?.[1])).toMatchObject({
+      channel: "C123ABC",
+      user: "U789GHI",
     });
   });
 

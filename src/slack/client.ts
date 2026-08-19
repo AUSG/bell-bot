@@ -17,6 +17,10 @@ interface PostMessageOptions {
   threadTs?: string;
 }
 
+interface PostEphemeralOptions extends PostMessageOptions {
+  user: string;
+}
+
 interface UpdateModalOptions {
   viewId: string;
   view: SlackModalView;
@@ -43,14 +47,19 @@ export async function postMessage(env: Env, options: PostMessageOptions): Promis
   await callSlackApi(
     env,
     "chat.postMessage",
-    {
-      channel: options.channel,
-      text: options.text,
-      blocks: options.blocks,
-      unfurl_links: false,
-      unfurl_media: false,
-      ...(options.threadTs ? { thread_ts: options.threadTs } : {}),
-    },
+    messagePayload(options),
+    { timeoutMs: SLACK_REQUEST_TIMEOUT_MS, retryRateLimit: true },
+  );
+}
+
+export async function postEphemeral(
+  env: Env,
+  options: PostEphemeralOptions,
+): Promise<void> {
+  await callSlackApi(
+    env,
+    "chat.postEphemeral",
+    { ...messagePayload(options), user: options.user },
     { timeoutMs: SLACK_REQUEST_TIMEOUT_MS, retryRateLimit: true },
   );
 }
@@ -123,6 +132,17 @@ async function callSlackApi(
   }
 
   throw new SlackApiError(method, "rate_limited", 429);
+}
+
+function messagePayload(options: PostMessageOptions): Record<string, unknown> {
+  return {
+    channel: options.channel,
+    text: options.text,
+    blocks: options.blocks,
+    unfurl_links: false,
+    unfurl_media: false,
+    ...(options.threadTs ? { thread_ts: options.threadTs } : {}),
+  };
 }
 
 async function fetchWithTimeout(

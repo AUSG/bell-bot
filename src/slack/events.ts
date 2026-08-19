@@ -1,7 +1,7 @@
 import { getGroupByName, listGroups } from "../db/groups";
 import type { BellCommand, SlackBlock, SlackMessage } from "../types";
 import { parseBellCommand } from "./commands";
-import { postMessage } from "./client";
+import { postEphemeral, postMessage } from "./client";
 
 const MAX_SECTION_TEXT_LENGTH = 2_800;
 const MAX_HEADER_TEXT_LENGTH = 150;
@@ -9,7 +9,12 @@ const MAX_HEADER_TEXT_LENGTH = 150;
 export interface AppMentionEvent {
   channel: string;
   text: string;
+  user: string;
   threadTs?: string;
+}
+
+interface CommandResponse extends SlackMessage {
+  visibility: "channel" | "ephemeral";
 }
 
 export type ParsedEventsRequest =
@@ -36,7 +41,11 @@ export function parseEventsRequest(payload: unknown): ParsedEventsRequest | null
   if (event.type !== "app_mention" || typeof event.bot_id === "string") {
     return { type: "ignored" };
   }
-  if (typeof event.channel !== "string" || typeof event.text !== "string") {
+  if (
+    typeof event.channel !== "string" ||
+    typeof event.text !== "string" ||
+    typeof event.user !== "string"
+  ) {
     return null;
   }
 
@@ -45,6 +54,7 @@ export function parseEventsRequest(payload: unknown): ParsedEventsRequest | null
     event: {
       channel: event.channel,
       text: event.text,
+      user: event.user,
       ...(typeof event.thread_ts === "string" ? { threadTs: event.thread_ts } : {}),
     },
   };
@@ -53,19 +63,24 @@ export function parseEventsRequest(payload: unknown): ParsedEventsRequest | null
 export async function handleAppMention(event: AppMentionEvent, env: Env): Promise<void> {
   const command = parseBellCommand(event.text);
   const message = await buildCommandMessage(command, env.DB);
-
-  await postMessage(env, {
+  const options = {
     channel: event.channel,
     text: message.text,
     blocks: message.blocks,
     ...(event.threadTs ? { threadTs: event.threadTs } : {}),
-  });
+  };
+
+  if (message.visibility === "channel") {
+    await postMessage(env, options);
+  } else {
+    await postEphemeral(env, { ...options, user: event.user });
+  }
 }
 
 export async function buildCommandMessage(
   command: BellCommand,
   db: D1Database,
-): Promise<SlackMessage> {
+): Promise<CommandResponse> {
   if (command.type === "help") {
     return helpMessage();
   }
@@ -115,19 +130,14 @@ export async function buildCommandMessage(
     );
   }
 
-  const header = `🔔 ${group.name}`;
-  return multiSectionMessage(
-    header,
-    chunkTokens(mentions),
-    `🔔 ${fallbackGroupName}\n\n${mentions.join(" ")}`,
-  );
+  return groupMentionMessage(group.name, mentions);
 }
 
 export function isSlackUserId(value: string): boolean {
   return /^[UW][A-Z0-9]{2,}$/.test(value);
 }
 
-function helpMessage(): SlackMessage {
+function helpMessage(): CommandResponse {
   const body = [
     "`@Bell [그룹명]`\n그룹의 모든 멤버를 호출합니다.",
     "`@Bell 목록`\n등록된 그룹을 확인합니다.",
@@ -138,7 +148,7 @@ function helpMessage(): SlackMessage {
   return sectionMessage("🔔 Bell 사용법", body, `🔔 Bell 사용법\n\n${body}`);
 }
 
-function sectionMessage(header: string, body: string, fallback: string): SlackMessage {
+function sectionMessage(header: string, body: string, fallback: string): CommandResponse {
   return multiSectionMessage(header, [body], fallback);
 }
 
@@ -146,7 +156,7 @@ function multiSectionMessage(
   header: string,
   sections: readonly string[],
   fallback: string,
-): SlackMessage {
+): CommandResponse {
   const blocks: SlackBlock[] = [
     {
       type: "header",
@@ -160,7 +170,26 @@ function multiSectionMessage(
     ),
   ];
 
-  return { text: fallback, blocks };
+  return { text: fallback, blocks, visibility: "ephemeral" };
+}
+
+function groupMentionMessage(
+  groupName: string,
+  mentions: readonly string[],
+): CommandResponse {
+  const displayName = escapeMrkdwn(groupName);
+  const memberText = mentions.join(" ");
+
+  return {
+    text: `🔔 ${displayName} — ${memberText}`,
+    blocks: [
+      {
+        type: "section",
+        text: { type: "mrkdwn", text: `:bell: *${displayName}* — ${memberText}` },
+      },
+    ],
+    visibility: "channel",
+  };
 }
 
 function chunkLines(lines: readonly string[]): string[] {

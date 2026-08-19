@@ -5,9 +5,7 @@ Bell은 AUSG Slack 워크스페이스에서 무료 플랜의 User Group 멘션 �
 ```text
 @Bell 10기 운영진
 
-🔔 10기 운영진
-
-@A @B @C @D
+🔔 **10기 운영진** — @A @B @C @D
 ```
 
 그룹과 Slack User ID는 Git 저장소가 아니라 Cloudflare D1 한 곳에 저장하며, `/bell` 모달에서 누구나 관리할 수 있습니다. 관리자·RBAC·별도 웹 UI는 두지 않습니다.
@@ -23,7 +21,7 @@ Cloudflare Worker
   ├── Slack 서명 검증
   ├── 명령 파싱
   ├── Block Kit / Modal
-  └── Slack Web API ──────────────▶ Slack 채널 메시지
+  └── Slack Web API ──────────────▶ 채널 / ephemeral 메시지
   │
   ▼
 Cloudflare D1
@@ -48,33 +46,36 @@ Events API는 `app_mention`만 구독합니다. `message.channels`처럼 일반 
 ```
 
 해당 그룹의 실제 Slack User ID를 `<@U123ABC>` 형식으로 멘션합니다.
+실제 그룹 호출만 채널 전체에 한 줄로 표시되고 멤버에게 알림을 보냅니다.
 
 ```text
 @Bell 목록
 @Bell list
 ```
 
-전체 그룹과 인원 수를 보여줍니다.
+전체 그룹과 인원 수를 호출자에게만 보여줍니다.
 
 ```text
 @Bell 10기 운영진 목록
 @Bell 10기 운영진 list
 ```
 
-특정 그룹의 구성원을 실제 멘션으로 보여줍니다.
+특정 그룹의 구성원을 실제 멘션 형태로 호출자에게만 보여줍니다.
 
 ```text
 @Bell help
 @Bell 도움말
 ```
 
-사용법을 보여줍니다.
+사용법을 호출자에게만 보여줍니다.
 
 ```text
 /bell
 ```
 
 그룹 관리 모달을 엽니다. 기존 그룹 선택, 새 그룹 생성, 이름 변경, `multi_users_select`를 이용한 멤버 교체, 확인 후 삭제를 지원합니다. 빈 그룹도 저장할 수 있습니다.
+
+목록·도움말·없는 그룹·빈 그룹 안내는 `chat.postEphemeral`로 보내므로 Bell의 응답은 호출자에게만 보입니다. 다만 `@Bell 목록`처럼 사용자가 채널에 작성한 호출 메시지 자체는 일반 Slack 메시지이므로 채널에 남습니다. 완전히 비공개로 관리하려면 `/bell` 모달을 사용합니다.
 
 `목록`, `list`, `도움말`, `help`와 `… 목록` / `… list`처럼 Bell 명령으로 해석되는 이름은 저장할 수 없습니다. 그룹 이름은 Unicode NFC와 단일 공백으로 정규화하므로 Modal에서 만든 이름과 Slack 메시지의 이름이 동일하게 조회됩니다.
 

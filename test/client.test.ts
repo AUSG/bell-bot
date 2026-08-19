@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   openModal,
+  postEphemeral,
   postMessage,
 } from "../src/slack/client";
 import type { SlackApiError } from "../src/slack/client";
@@ -34,6 +35,31 @@ describe("Slack Web API client", () => {
     expect(fetchSpy.mock.calls[0]?.[0]).toBe(
       "https://slack.com/api/chat.postMessage",
     );
+  });
+
+  it("targets one channel member with chat.postEphemeral", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({ ok: true }),
+    );
+
+    await postEphemeral(env, {
+      channel: "C123ABC",
+      user: "U123ABC",
+      text: "private help",
+      blocks: [],
+      threadTs: "123.456",
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      "https://slack.com/api/chat.postEphemeral",
+    );
+    expect(parseRequestBody(fetchSpy.mock.calls[0]?.[1])).toMatchObject({
+      channel: "C123ABC",
+      user: "U123ABC",
+      text: "private help",
+      thread_ts: "123.456",
+    });
   });
 
   it("does not wait and retry views.open because trigger IDs expire quickly", async () => {
@@ -86,6 +112,13 @@ function jsonResponse(body: unknown, init?: ResponseInit): Response {
       ...Object.fromEntries(new Headers(init?.headers)),
     },
   });
+}
+
+function parseRequestBody(init: RequestInit | undefined): unknown {
+  if (typeof init?.body !== "string") {
+    throw new Error("Expected a string request body");
+  }
+  return JSON.parse(init.body) as unknown;
 }
 
 function emptyModal(): SlackModalView {
