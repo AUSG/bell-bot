@@ -108,8 +108,12 @@ describe("Worker routing and Slack authentication", () => {
       text: "<@U999BOT> 행사 TF 오늘 3시에 모여주세요",
     },
     {
-      label: "multiline body",
+      label: "group-only first line",
       text: "<@U999BOT> 행사 TF\n오늘 3시에 모여주세요",
+    },
+    {
+      label: "same-line body followed by more lines",
+      text: "<@U999BOT> 행사 TF 오늘 3시에 모여주세요\n장소는 회의실입니다\n늦지 않게 와주세요",
     },
     {
       label: "explicit pipe separator",

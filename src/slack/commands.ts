@@ -96,6 +96,6 @@ function extractCommandSegment(value: string): {
 
   return {
     command: normalizeGroupName(commandText),
-    allowPrefixMatch: newlineIndex < 0 && separator?.index === undefined,
+    allowPrefixMatch: separator?.index === undefined,
   };
 }

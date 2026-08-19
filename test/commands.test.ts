@@ -37,11 +37,20 @@ describe("Slack mention parsing", () => {
     });
   });
 
-  it("uses only the first line as an exact group name", () => {
+  it("uses only the first line while still allowing longest-prefix matching", () => {
     expect(parseBellCommand("<@U123ABC> 행사팀\n오늘 3시에 모여주세요")).toEqual({
       type: "group_request",
       groupText: "행사팀",
-      allowPrefixMatch: false,
+      allowPrefixMatch: true,
+    });
+    expect(
+      parseBellCommand(
+        "<@U123ABC> 행사팀 오늘 3시에 모여주세요\n장소는 회의실입니다",
+      ),
+    ).toEqual({
+      type: "group_request",
+      groupText: "행사팀 오늘 3시에 모여주세요",
+      allowPrefixMatch: true,
     });
   });
 
