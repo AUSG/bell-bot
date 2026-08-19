@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "bell-bot",
+  "account_id": "dec3126a149bbaf5bf156247070a802d",
   "main": "src/index.ts",
   // Latest date supported by the workerd version bundled with Wrangler 4.124.0.
   "compatibility_date": "2026-08-15",
@@ -8,8 +9,7 @@
     {
       "binding": "DB",
       "database_name": "bell",
-      // Replace this placeholder with the ID printed by `wrangler d1 create bell`.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "43136dd0-5f96-45a6-b05a-6c9c681233a4",
       "migrations_dir": "migrations"
     }
   ],
