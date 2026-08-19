@@ -1,0 +1,27 @@
+{
+  "name": "bell-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "cf-typegen": "wrangler types",
+    "cf-typegen:check": "wrangler types --check",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p test/tsconfig.json && tsc --noEmit -p tsconfig.node.json",
+    "lint": "eslint src test",
+    "test": "SLACK_BOT_TOKEN=test-token SLACK_SIGNING_SECRET=test-signing-secret vitest run",
+    "check": "npm run cf-typegen:check && npm run typecheck && npm run lint && npm test"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.0.0",
+    "eslint": "^10.8.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.67.0",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.124.0"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "bell-bot",
+  "main": "src/index.ts",
+  // Latest date supported by the workerd version bundled with Wrangler 4.124.0.
+  "compatibility_date": "2026-08-15",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bell",
+      // Replace this placeholder with the ID printed by `wrangler d1 create bell`.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "secrets": {
+    "required": ["SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET"]
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.1
+    }
+  }
+}
