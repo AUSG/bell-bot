@@ -88,7 +88,8 @@ export async function buildCommandMessage(
   if (command.type === "list_groups") {
     const groups = await listGroups(db);
     if (groups.length === 0) {
-      const body = "아직 등록된 그룹이 없어요.\n\n`/bell`에서 첫 그룹을 만들 수 있어요.";
+      const body =
+        "아직 등록된 그룹이 없어요.\n\n`/bell` 또는 `Bell 그룹 관리` 바로가기에서 첫 그룹을 만들 수 있어요.";
       return sectionMessage("🔔 등록된 그룹", body, `🔔 등록된 그룹\n\n${body}`);
     }
 
@@ -142,7 +143,7 @@ function helpMessage(): CommandResponse {
     "`@Bell [그룹명]`\n그룹의 모든 멤버를 호출합니다.",
     "`@Bell 목록`\n등록된 그룹을 확인합니다.",
     "`@Bell [그룹명] 목록`\n해당 그룹의 구성원을 확인합니다.",
-    "`/bell`\n그룹을 관리합니다.",
+    "`/bell` 또는 `Bell 그룹 관리` 바로가기\n그룹을 관리합니다.",
   ].join("\n\n");
 
   return sectionMessage("🔔 Bell 사용법", body, `🔔 Bell 사용법\n\n${body}`);

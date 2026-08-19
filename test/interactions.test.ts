@@ -9,6 +9,7 @@ import {
 import {
   buildGroupManagerView,
   GROUP_FORM_CALLBACK_ID,
+  GROUP_MANAGER_SHORTCUT_CALLBACK_ID,
   groupFormFieldIds,
   handleInteraction,
   type GroupFormMetadata,
@@ -19,6 +20,20 @@ beforeEach(async () => {
 });
 
 describe("group management modal", () => {
+  it("ignores unknown global shortcuts without opening a modal", async () => {
+    const response = await handleInteraction(
+      {
+        type: "shortcut",
+        callback_id: `${GROUP_MANAGER_SHORTCUT_CALLBACK_ID}_unknown`,
+        trigger_id: "trigger-id",
+      },
+      env,
+      createExecutionContext(),
+    );
+
+    expect(response.status).toBe(200);
+  });
+
   it("uses Slack's multi-user selector", () => {
     const view = buildGroupManagerView([], null);
     expect(JSON.stringify(view)).toContain('"type":"multi_users_select"');

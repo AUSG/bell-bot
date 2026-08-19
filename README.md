@@ -15,7 +15,7 @@ Bell은 AUSG Slack 워크스페이스에서 무료 플랜의 User Group 멘션 �
 ```text
 Slack
   │
-  │  Events API / Slash Command / Interactions
+  │  Events API / Slash Command / Global Shortcut / Interactions
   ▼
 Cloudflare Worker
   ├── Slack 서명 검증
@@ -35,7 +35,7 @@ Worker는 다음 세 endpoint만 제공합니다.
 | --- | --- |
 | `POST /slack/events` | `url_verification`, `app_mention` |
 | `POST /slack/commands` | `/bell` |
-| `POST /slack/interactions` | 모달 선택·저장·삭제 |
+| `POST /slack/interactions` | 전역 바로가기, 모달 선택·저장·삭제 |
 
 Events API는 `app_mention`만 구독합니다. `message.channels`처럼 일반 채널 메시지를 모두 받는 이벤트는 사용하지 않습니다.
 
@@ -71,9 +71,11 @@ Events API는 `app_mention`만 구독합니다. `message.channels`처럼 일반 
 
 ```text
 /bell
+
+Bell 그룹 관리 (전역 바로가기)
 ```
 
-그룹 관리 모달을 엽니다. 기존 그룹 선택, 새 그룹 생성, 이름 변경, `multi_users_select`를 이용한 멤버 교체, 확인 후 삭제를 지원합니다. 빈 그룹도 저장할 수 있습니다.
+동일한 그룹 관리 모달을 엽니다. `/bell`은 Slack의 플랫폼 제한으로 스레드 입력창에서 실행되지 않지만, 전역 바로가기는 메시지 작성기의 바로가기 메뉴나 Slack 검색에서 실행할 수 있습니다. 기존 그룹 선택, 새 그룹 생성, 이름 변경, `multi_users_select`를 이용한 멤버 교체, 확인 후 삭제를 지원합니다. 빈 그룹도 저장할 수 있습니다.
 
 목록·도움말·없는 그룹·빈 그룹 안내는 `chat.postEphemeral`로 보내므로 Bell의 응답은 호출자에게만 보입니다. 다만 `@Bell 목록`처럼 사용자가 채널에 작성한 호출 메시지 자체는 일반 Slack 메시지이므로 채널에 남습니다. 완전히 비공개로 관리하려면 `/bell` 모달을 사용합니다.
 
@@ -124,6 +126,16 @@ Interactivity & Shortcuts를 켜고 Request URL을 지정합니다.
 ```text
 https://<WORKER_DOMAIN>/slack/interactions
 ```
+
+같은 화면의 Shortcuts에서 Global Shortcut을 하나 추가합니다.
+
+```text
+Name: Bell 그룹 관리
+Short Description: Bell 그룹관리 모달을 엽니다
+Callback ID: bell_manage_groups
+```
+
+Shortcut은 텍스트 명령이 아니므로 별도의 띄어쓰기 alias가 없습니다. 표시 이름에는 `그룹 관리`, 설명에는 `그룹관리`를 사용해 두 표기를 모두 노출합니다. 기존 `commands` scope와 Interactivity Request URL을 그대로 사용하므로 scope 추가나 앱 재설치는 필요하지 않습니다.
 
 ## Cloudflare 설정
 

@@ -14,6 +14,7 @@ import { openModal, updateModal } from "./client";
 import { isSlackUserId } from "./events";
 
 export const GROUP_FORM_CALLBACK_ID = "bell_group_form";
+export const GROUP_MANAGER_SHORTCUT_CALLBACK_ID = "bell_manage_groups";
 export const GROUP_SELECT_ACTION_ID = "bell_group_select";
 export const GROUP_DELETE_ACTION_ID = "bell_group_delete";
 export const GROUP_NAME_BLOCK_ID = "group_name";
@@ -70,6 +71,22 @@ export async function handleInteraction(
 ): Promise<Response> {
   if (!isRecord(payload) || typeof payload.type !== "string") {
     return new Response("Invalid interaction payload", { status: 400 });
+  }
+
+  if (payload.type === "shortcut") {
+    if (payload.callback_id !== GROUP_MANAGER_SHORTCUT_CALLBACK_ID) {
+      return new Response(null, { status: 200 });
+    }
+    if (typeof payload.trigger_id !== "string" || !payload.trigger_id) {
+      return new Response("Invalid shortcut payload", { status: 400 });
+    }
+
+    ctx.waitUntil(
+      openGroupManager(payload.trigger_id, env).catch((error: unknown) => {
+        logError("open_group_manager_shortcut", error);
+      }),
+    );
+    return new Response(null, { status: 200 });
   }
 
   if (payload.type === "block_actions") {

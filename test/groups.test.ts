@@ -204,6 +204,13 @@ describe("D1 group repository", () => {
 });
 
 describe("command messages", () => {
+  it("includes both group-management entry points in help", async () => {
+    const message = await buildCommandMessage({ type: "help" }, env.DB);
+
+    expect(message.text).toContain("`/bell` 또는 `Bell 그룹 관리` 바로가기");
+    expect(message.visibility).toBe("ephemeral");
+  });
+
   it("renders an actual Slack mention for a group", async () => {
     await createGroup(env.DB, "행사 TF", ["U123ABC", "U456DEF"]);
     const message = await buildCommandMessage(

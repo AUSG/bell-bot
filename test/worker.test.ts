@@ -7,6 +7,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "../src/index";
 import { createGroup } from "../src/db/groups";
+import { GROUP_MANAGER_SHORTCUT_CALLBACK_ID } from "../src/slack/interactions";
 import { signSlackBody } from "./helpers";
 
 beforeEach(async () => {
@@ -164,6 +165,41 @@ describe("Worker routing and Slack authentication", () => {
     const init = slackFetch.mock.calls[0]?.[1];
     const payload = parseRequestBody(init);
     expect(payload).toMatchObject({ trigger_id: "trigger-id" });
+  });
+
+  it("acknowledges the global shortcut and opens the same management modal", async () => {
+    const slackFetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response('{"ok":true}', { status: 200 }));
+    const body = new URLSearchParams({
+      payload: JSON.stringify({
+        type: "shortcut",
+        callback_id: GROUP_MANAGER_SHORTCUT_CALLBACK_ID,
+        trigger_id: "shortcut-trigger-id",
+        user: { id: "U123ABC" },
+      }),
+    }).toString();
+    const ctx = createExecutionContext();
+    const request = await signedRequest(
+      "/slack/interactions",
+      body,
+      "application/x-www-form-urlencoded",
+    );
+
+    const response = await worker.fetch(
+      request as Parameters<typeof worker.fetch>[0],
+      env,
+      ctx,
+    );
+    expect(response.status).toBe(200);
+    await waitOnExecutionContext(ctx);
+
+    expect(slackFetch).toHaveBeenCalledTimes(1);
+    expect(slackFetch.mock.calls[0]?.[0]).toBe("https://slack.com/api/views.open");
+    expect(parseRequestBody(slackFetch.mock.calls[0]?.[1])).toMatchObject({
+      trigger_id: "shortcut-trigger-id",
+      view: { callback_id: "bell_group_form" },
+    });
   });
 });
 
