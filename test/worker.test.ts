@@ -43,6 +43,7 @@ describe("Worker routing and Slack authentication", () => {
         channel: "C123ABC",
         user: "U123ABC",
         text: "<@U123ABC> 목록",
+        ts: "1710000000.000001",
       },
     });
     const response = await signedFetch("/slack/events", body, "application/json", {
@@ -68,6 +69,7 @@ describe("Worker routing and Slack authentication", () => {
         channel: "C123ABC",
         user: "U789GHI",
         text: "<@U999BOT> 행사 TF",
+        ts: "1710000000.000002",
       },
     });
     const ctx = createExecutionContext();
@@ -89,6 +91,7 @@ describe("Worker routing and Slack authentication", () => {
     const payload = parseRequestBody(init);
     expect(payload).toMatchObject({
       channel: "C123ABC",
+      thread_ts: "1710000000.000002",
       text: "🔔 행사 TF — <@U123ABC> <@U456DEF>",
       blocks: [
         {
@@ -131,6 +134,7 @@ describe("Worker routing and Slack authentication", () => {
         channel: "C123ABC",
         user: "U789GHI",
         text,
+        ts: "1710000000.000003",
       },
     });
     const ctx = createExecutionContext();
@@ -150,7 +154,42 @@ describe("Worker routing and Slack authentication", () => {
     );
     expect(parseRequestBody(slackFetch.mock.calls[0]?.[1])).toMatchObject({
       channel: "C123ABC",
+      thread_ts: "1710000000.000003",
       text: "🔔 행사 TF — <@U123ABC> <@U456DEF>",
+    });
+  });
+
+  it("replies to the parent when Bell is mentioned in an existing thread", async () => {
+    await createGroup(env.DB, "행사 TF", ["U123ABC"]);
+    const slackFetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response('{"ok":true}', { status: 200 }));
+    const body = JSON.stringify({
+      type: "event_callback",
+      event: {
+        type: "app_mention",
+        channel: "C123ABC",
+        user: "U789GHI",
+        text: "<@U999BOT> 행사 TF",
+        ts: "1710000000.000005",
+        thread_ts: "1710000000.000004",
+      },
+    });
+    const ctx = createExecutionContext();
+    const request = await signedRequest("/slack/events", body, "application/json");
+
+    const response = await worker.fetch(
+      request as Parameters<typeof worker.fetch>[0],
+      env,
+      ctx,
+    );
+    expect(response.status).toBe(200);
+    await waitOnExecutionContext(ctx);
+
+    expect(parseRequestBody(slackFetch.mock.calls[0]?.[1])).toMatchObject({
+      channel: "C123ABC",
+      thread_ts: "1710000000.000004",
+      text: "🔔 행사 TF — <@U123ABC>",
     });
   });
 
@@ -166,6 +205,7 @@ describe("Worker routing and Slack authentication", () => {
         channel: "C123ABC",
         user: "U789GHI",
         text: "<@U999BOT> 목록",
+        ts: "1710000000.000006",
       },
     });
     const ctx = createExecutionContext();
@@ -183,10 +223,12 @@ describe("Worker routing and Slack authentication", () => {
     expect(slackFetch.mock.calls[0]?.[0]).toBe(
       "https://slack.com/api/chat.postEphemeral",
     );
-    expect(parseRequestBody(slackFetch.mock.calls[0]?.[1])).toMatchObject({
+    const payload = parseRequestBody(slackFetch.mock.calls[0]?.[1]);
+    expect(payload).toMatchObject({
       channel: "C123ABC",
       user: "U789GHI",
     });
+    expect(payload).not.toHaveProperty("thread_ts");
   });
 
   it("acknowledges /bell and opens a management modal in the background", async () => {

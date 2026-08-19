@@ -13,6 +13,7 @@ const MAX_GROUP_QUERY_DISPLAY_LENGTH = 75;
 
 export interface AppMentionEvent {
   channel: string;
+  messageTs: string;
   text: string;
   user: string;
   threadTs?: string;
@@ -48,6 +49,7 @@ export function parseEventsRequest(payload: unknown): ParsedEventsRequest | null
   }
   if (
     typeof event.channel !== "string" ||
+    typeof event.ts !== "string" ||
     typeof event.text !== "string" ||
     typeof event.user !== "string"
   ) {
@@ -58,6 +60,7 @@ export function parseEventsRequest(payload: unknown): ParsedEventsRequest | null
     type: "app_mention",
     event: {
       channel: event.channel,
+      messageTs: event.ts,
       text: event.text,
       user: event.user,
       ...(typeof event.thread_ts === "string" ? { threadTs: event.thread_ts } : {}),
@@ -68,17 +71,24 @@ export function parseEventsRequest(payload: unknown): ParsedEventsRequest | null
 export async function handleAppMention(event: AppMentionEvent, env: Env): Promise<void> {
   const command = parseBellCommand(event.text);
   const message = await buildCommandMessage(command, env.DB);
-  const options = {
+  const baseOptions = {
     channel: event.channel,
     text: message.text,
     blocks: message.blocks,
-    ...(event.threadTs ? { threadTs: event.threadTs } : {}),
   };
 
   if (message.visibility === "channel") {
-    await postMessage(env, options);
+    await postMessage(env, {
+      ...baseOptions,
+      threadTs: event.threadTs ?? event.messageTs,
+    });
   } else {
-    await postEphemeral(env, { ...options, user: event.user });
+    await postEphemeral(env, {
+      ...baseOptions,
+      user: event.user,
+      // Slack only displays threaded ephemeral messages in an existing thread.
+      ...(event.threadTs ? { threadTs: event.threadTs } : {}),
+    });
   }
 }
 
@@ -152,9 +162,9 @@ export function isSlackUserId(value: string): boolean {
 function helpMessage(): CommandResponse {
   const sections = [
     [
-      "*그룹 호출 · 채널 공개*",
+      "*그룹 호출 · 스레드 공개*",
       "`@Bell 행사팀`",
-      "행사팀의 모든 멤버를 채널에 실제 멘션해 알림을 보냅니다. Bell 응답은 `🔔 행사팀 — @멤버…` 한 줄로 표시돼요.",
+      "행사팀의 모든 멤버를 호출 메시지의 댓글에서 실제 멘션해 알림을 보냅니다. 새 글에서 호출해도 Bell이 별도의 채널 글을 만들지 않고 해당 글의 첫 댓글로 답해요.",
     ].join("\n"),
     [
       "*공지 본문과 함께 호출*",

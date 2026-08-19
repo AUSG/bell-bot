@@ -233,6 +233,7 @@ describe("command messages", () => {
     expect(message.text).toContain("`@Bell 행사팀 | 오늘 3시에 모여주세요`");
     expect(message.text).toContain("첫 줄만 명령으로 읽습니다");
     expect(message.text).toContain("가장 긴 이름");
+    expect(message.text).toContain("해당 글의 첫 댓글로 답해요");
     expect(message.text).toContain("`/bell` 또는 `Bell 그룹 관리` 바로가기");
     expect(message.visibility).toBe("ephemeral");
   });
