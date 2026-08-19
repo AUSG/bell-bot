@@ -9,7 +9,11 @@ import {
   updateGroup,
 } from "../db/groups";
 import type { Group, GroupIdentity, SlackBlock, SlackModalView, SlackOption } from "../types";
-import { isReservedGroupName, normalizeGroupName } from "./commands";
+import {
+  isReservedGroupName,
+  MAX_GROUP_NAME_LENGTH,
+  normalizeGroupName,
+} from "./commands";
 import { openModal, updateModal } from "./client";
 import { isSlackUserId } from "./events";
 
@@ -24,7 +28,6 @@ export const GROUP_MEMBERS_ACTION_ID = "group_members_value";
 
 const NEW_GROUP_OPTION_VALUE = "new";
 const GROUP_OPTION_PREFIX = "group:";
-const MAX_GROUP_NAME_LENGTH = 75;
 const MAX_GROUP_MEMBERS = 100;
 
 export type GroupFormMetadata =

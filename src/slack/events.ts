@@ -1,10 +1,15 @@
-import { getGroupByName, listGroups } from "../db/groups";
+import { getLongestMatchingGroup, listGroups } from "../db/groups";
 import type { BellCommand, SlackBlock, SlackMessage } from "../types";
-import { parseBellCommand } from "./commands";
+import {
+  buildGroupNameCandidates,
+  isMemberListRequest,
+  parseBellCommand,
+} from "./commands";
 import { postEphemeral, postMessage } from "./client";
 
 const MAX_SECTION_TEXT_LENGTH = 2_800;
 const MAX_HEADER_TEXT_LENGTH = 150;
+const MAX_GROUP_QUERY_DISPLAY_LENGTH = 75;
 
 export interface AppMentionEvent {
   channel: string;
@@ -103,9 +108,15 @@ export async function buildCommandMessage(
     );
   }
 
-  const group = await getGroupByName(db, command.groupName);
+  const group = await getLongestMatchingGroup(
+    db,
+    buildGroupNameCandidates(command.groupText, command.allowPrefixMatch),
+  );
   if (!group) {
-    const displayName = inlineCode(command.groupName);
+    const displayName = inlineCode(truncateWithEllipsis(
+      command.groupText,
+      MAX_GROUP_QUERY_DISPLAY_LENGTH,
+    ));
     const body = `${displayName} 그룹을 찾지 못했어요.\n\n\`@Bell 목록\`으로 등록된 그룹을 확인할 수 있어요.`;
     return sectionMessage("🔔 Bell", body, `🔔 ${body}`);
   }
@@ -121,7 +132,7 @@ export async function buildCommandMessage(
     );
   }
 
-  if (command.type === "list_members") {
+  if (isMemberListRequest(command.groupText, group.name)) {
     const header = `🔔 ${group.name} · ${mentions.length}명`;
     const fallbackHeader = `🔔 ${fallbackGroupName} · ${mentions.length}명`;
     return multiSectionMessage(
@@ -139,14 +150,35 @@ export function isSlackUserId(value: string): boolean {
 }
 
 function helpMessage(): CommandResponse {
-  const body = [
-    "`@Bell [그룹명]`\n그룹의 모든 멤버를 호출합니다.",
-    "`@Bell 목록`\n등록된 그룹을 확인합니다.",
-    "`@Bell [그룹명] 목록`\n해당 그룹의 구성원을 확인합니다.",
-    "`/bell` 또는 `Bell 그룹 관리` 바로가기\n그룹을 관리합니다.",
-  ].join("\n\n");
+  const sections = [
+    [
+      "*그룹 호출 · 채널 공개*",
+      "`@Bell 행사팀`",
+      "행사팀의 모든 멤버를 채널에 실제 멘션해 알림을 보냅니다. Bell 응답은 `🔔 행사팀 — @멤버…` 한 줄로 표시돼요.",
+    ].join("\n"),
+    [
+      "*공지 본문과 함께 호출*",
+      "`@Bell 행사팀 오늘 3시에 모여주세요`",
+      "```@Bell 행사팀\n오늘 3시에 모여주세요```",
+      "`@Bell 행사팀 | 오늘 3시에 모여주세요`",
+      "같은 줄에서는 메시지 앞부분과 일치하는 등록 그룹 중 가장 긴 이름을 사용합니다. 예를 들어 `AUSG`와 `AUSG 운영진`이 모두 있으면 `AUSG 운영진`을 선택해요.",
+      "줄바꿈 뒤의 본문은 그룹명에 포함하지 않습니다. 그룹명이 헷갈릴 수 있으면 공백을 포함한 ` | ` 구분자로 경계를 명확히 지정하세요. 본문은 원래 메시지에 남고 Bell은 멘션 한 줄만 추가합니다.",
+    ].join("\n"),
+    [
+      "*그룹 조회 · 요청자에게만 표시*",
+      "`@Bell 목록` 또는 `@Bell list` — 등록된 전체 그룹",
+      "`@Bell 행사팀 목록` 또는 `@Bell 행사팀 list` — 행사팀 구성원",
+      "그룹명 뒤의 나머지가 정확히 `목록` 또는 `list`일 때만 구성원 조회로 처리합니다. 조회 결과, 도움말, 오류 안내는 요청한 사람에게만 보여요.",
+    ].join("\n"),
+    [
+      "*그룹 관리*",
+      "`/bell` 또는 `Bell 그룹 관리` 바로가기에서 생성·이름 변경·멤버 변경·삭제를 할 수 있습니다.",
+      "`/bell`은 Slack 제한으로 스레드에서 실행되지 않습니다. 스레드에서는 작성기 바로가기 메뉴에서 `그룹 관리` 또는 `그룹관리`를 검색하세요.",
+    ].join("\n"),
+  ];
+  const fallback = `🔔 Bell 사용법\n\n${sections.join("\n\n")}`;
 
-  return sectionMessage("🔔 Bell 사용법", body, `🔔 Bell 사용법\n\n${body}`);
+  return multiSectionMessage("🔔 Bell 사용법", sections, fallback);
 }
 
 function sectionMessage(header: string, body: string, fallback: string): CommandResponse {
@@ -243,6 +275,14 @@ function inlineCode(value: string): string {
 
 function truncate(value: string, maxLength: number): string {
   return Array.from(value).slice(0, maxLength).join("");
+}
+
+function truncateWithEllipsis(value: string, maxLength: number): string {
+  const characters = Array.from(value);
+  if (characters.length <= maxLength) {
+    return value;
+  }
+  return `${characters.slice(0, Math.max(0, maxLength - 1)).join("")}…`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

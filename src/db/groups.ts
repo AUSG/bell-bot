@@ -167,6 +167,40 @@ export async function getGroupByName(
   return hydrateGroup(result.results);
 }
 
+export async function getLongestMatchingGroup(
+  db: D1Database,
+  candidates: readonly string[],
+): Promise<Group | null> {
+  const uniqueCandidates = [...new Set(candidates)].filter(Boolean);
+  const firstCandidate = uniqueCandidates[0];
+  if (!firstCandidate) {
+    return null;
+  }
+  if (uniqueCandidates.length === 1) {
+    return getGroupByName(db, firstCandidate);
+  }
+
+  const placeholders = uniqueCandidates.map(() => "?").join(", ");
+  const result = await db
+    .prepare(
+      `WITH matched_group AS (
+         SELECT id, name
+         FROM "groups"
+         WHERE name IN (${placeholders})
+         ORDER BY length(name) DESC
+         LIMIT 1
+       )
+       SELECT g.id, g.name, m.slack_user_id
+       FROM matched_group AS g
+       LEFT JOIN group_members AS m ON m.group_id = g.id
+       ORDER BY m.slack_user_id`,
+    )
+    .bind(...uniqueCandidates)
+    .all<GroupMemberRow>();
+
+  return hydrateGroup(result.results);
+}
+
 export async function getGroupById(db: D1Database, id: number): Promise<Group | null> {
   const result = await db
     .prepare(

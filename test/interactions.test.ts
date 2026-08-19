@@ -115,7 +115,7 @@ describe("group management modal", () => {
     });
   });
 
-  it.each(["목록", "HELP", "행사 TF 목록", "행사 TF list"])(
+  it.each(["목록", "HELP", "행사 TF 목록", "행사 TF list", "행사팀 | 공지"])(
     "rejects a group name that would be parsed as a command: %s",
     async (name) => {
       const metadata: GroupFormMetadata = { mode: "create" };

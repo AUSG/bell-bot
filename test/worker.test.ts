@@ -102,6 +102,54 @@ describe("Worker routing and Slack authentication", () => {
     });
   });
 
+  it.each([
+    {
+      label: "same-line body",
+      text: "<@U999BOT> 행사 TF 오늘 3시에 모여주세요",
+    },
+    {
+      label: "multiline body",
+      text: "<@U999BOT> 행사 TF\n오늘 3시에 모여주세요",
+    },
+    {
+      label: "explicit pipe separator",
+      text: "<@U999BOT> 행사 TF | 오늘 3시에 모여주세요",
+    },
+  ])("resolves a group before the $label", async ({ text }) => {
+    await createGroup(env.DB, "행사 TF", ["U123ABC", "U456DEF"]);
+    const slackFetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response('{"ok":true}', { status: 200 }));
+    const body = JSON.stringify({
+      type: "event_callback",
+      event: {
+        type: "app_mention",
+        channel: "C123ABC",
+        user: "U789GHI",
+        text,
+      },
+    });
+    const ctx = createExecutionContext();
+    const request = await signedRequest("/slack/events", body, "application/json");
+
+    const response = await worker.fetch(
+      request as Parameters<typeof worker.fetch>[0],
+      env,
+      ctx,
+    );
+    expect(response.status).toBe(200);
+    await waitOnExecutionContext(ctx);
+
+    expect(slackFetch).toHaveBeenCalledTimes(1);
+    expect(slackFetch.mock.calls[0]?.[0]).toBe(
+      "https://slack.com/api/chat.postMessage",
+    );
+    expect(parseRequestBody(slackFetch.mock.calls[0]?.[1])).toMatchObject({
+      channel: "C123ABC",
+      text: "🔔 행사 TF — <@U123ABC> <@U456DEF>",
+    });
+  });
+
   it("shows group lists only to the member who requested them", async () => {
     await createGroup(env.DB, "행사 TF", ["U123ABC"]);
     const slackFetch = vi

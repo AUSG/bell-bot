@@ -16,8 +16,11 @@ export interface Group {
 export type BellCommand =
   | { type: "help" }
   | { type: "list_groups" }
-  | { type: "list_members"; groupName: string }
-  | { type: "mention_group"; groupName: string };
+  | {
+      type: "group_request";
+      groupText: string;
+      allowPrefixMatch: boolean;
+    };
 
 export interface SlackPlainText {
   type: "plain_text";

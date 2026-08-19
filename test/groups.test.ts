@@ -6,6 +6,7 @@ import {
   getGroupById,
   getGroupManagerSnapshot,
   getGroupByName,
+  getLongestMatchingGroup,
   GroupLimitReachedError,
   GroupNameConflictError,
   GroupNotFoundError,
@@ -201,12 +202,33 @@ describe("D1 group repository", () => {
 
     expect(table?.wr).toBe(1);
   });
+
+  it("selects the longest registered group without loading every group", async () => {
+    await createGroup(env.DB, "AUSG", ["U123ABC"]);
+    await createGroup(env.DB, "AUSG 운영진", ["U456DEF"]);
+
+    const group = await getLongestMatchingGroup(env.DB, [
+      "AUSG 운영진 오늘 3시에 모여주세요",
+      "AUSG 운영진 오늘 3시에",
+      "AUSG 운영진 오늘",
+      "AUSG 운영진",
+      "AUSG",
+    ]);
+
+    expect(typeof group?.id).toBe("number");
+    expect(group?.name).toBe("AUSG 운영진");
+    expect(group?.members).toEqual(["U456DEF"]);
+  });
 });
 
 describe("command messages", () => {
-  it("includes both group-management entry points in help", async () => {
+  it("explains group calls with body text and both management entry points", async () => {
     const message = await buildCommandMessage({ type: "help" }, env.DB);
 
+    expect(message.text).toContain("`@Bell 행사팀 오늘 3시에 모여주세요`");
+    expect(message.text).toContain("@Bell 행사팀\n오늘 3시에 모여주세요");
+    expect(message.text).toContain("`@Bell 행사팀 | 오늘 3시에 모여주세요`");
+    expect(message.text).toContain("가장 긴 이름");
     expect(message.text).toContain("`/bell` 또는 `Bell 그룹 관리` 바로가기");
     expect(message.visibility).toBe("ephemeral");
   });
@@ -214,7 +236,7 @@ describe("command messages", () => {
   it("renders an actual Slack mention for a group", async () => {
     await createGroup(env.DB, "행사 TF", ["U123ABC", "U456DEF"]);
     const message = await buildCommandMessage(
-      { type: "mention_group", groupName: "행사 TF" },
+      { type: "group_request", groupText: "행사 TF", allowPrefixMatch: true },
       env.DB,
     );
     expect(message.text).toBe("🔔 행사 TF — <@U123ABC> <@U456DEF>");
@@ -233,7 +255,11 @@ describe("command messages", () => {
   it("renders a member list with its count", async () => {
     await createGroup(env.DB, "11기 운영진", ["U123ABC"]);
     const message = await buildCommandMessage(
-      { type: "list_members", groupName: "11기 운영진" },
+      {
+        type: "group_request",
+        groupText: "11기 운영진 목록",
+        allowPrefixMatch: true,
+      },
       env.DB,
     );
     expect(message.text).toBe("🔔 11기 운영진 · 1명\n\n<@U123ABC>");
@@ -242,7 +268,11 @@ describe("command messages", () => {
 
   it("explains when a group does not exist", async () => {
     const message = await buildCommandMessage(
-      { type: "mention_group", groupName: "100기 운영진" },
+      {
+        type: "group_request",
+        groupText: "100기 운영진",
+        allowPrefixMatch: true,
+      },
       env.DB,
     );
     expect(message.text).toContain("`100기 운영진` 그룹을 찾지 못했어요");
@@ -252,7 +282,7 @@ describe("command messages", () => {
   it("handles an empty group", async () => {
     await createGroup(env.DB, "빈 그룹", []);
     const message = await buildCommandMessage(
-      { type: "mention_group", groupName: "빈 그룹" },
+      { type: "group_request", groupText: "빈 그룹", allowPrefixMatch: true },
       env.DB,
     );
     expect(message.text).toBe("🔔 빈 그룹에는 아직 등록된 멤버가 없어요.");
@@ -271,12 +301,59 @@ describe("command messages", () => {
   it("escapes a group name in Slack's mrkdwn fallback without escaping member mentions", async () => {
     await createGroup(env.DB, "<!channel> & 운영진", ["U123ABC"]);
     const message = await buildCommandMessage(
-      { type: "mention_group", groupName: "<!channel> & 운영진" },
+      {
+        type: "group_request",
+        groupText: "<!channel> & 운영진",
+        allowPrefixMatch: true,
+      },
       env.DB,
     );
 
     expect(message.text).toBe(
       "🔔 &lt;!channel&gt; &amp; 운영진 — <@U123ABC>",
     );
+  });
+
+  it("uses the longest registered group when body text follows on the same line", async () => {
+    await createGroup(env.DB, "AUSG", ["U123ABC"]);
+    await createGroup(env.DB, "AUSG 운영진", ["U456DEF"]);
+
+    const message = await buildCommandMessage(
+      {
+        type: "group_request",
+        groupText: "AUSG 운영진 오늘 3시에 모여주세요",
+        allowPrefixMatch: true,
+      },
+      env.DB,
+    );
+
+    expect(message.text).toBe("🔔 AUSG 운영진 — <@U456DEF>");
+    expect(message.visibility).toBe("channel");
+  });
+
+  it("treats only an exact trailing list command as a private member lookup", async () => {
+    await createGroup(env.DB, "행사팀", ["U123ABC"]);
+
+    const announcement = await buildCommandMessage(
+      {
+        type: "group_request",
+        groupText: "행사팀 오늘 할 일 목록",
+        allowPrefixMatch: true,
+      },
+      env.DB,
+    );
+    const memberList = await buildCommandMessage(
+      {
+        type: "group_request",
+        groupText: "행사팀 목록",
+        allowPrefixMatch: true,
+      },
+      env.DB,
+    );
+
+    expect(announcement.text).toBe("🔔 행사팀 — <@U123ABC>");
+    expect(announcement.visibility).toBe("channel");
+    expect(memberList.text).toBe("🔔 행사팀 · 1명\n\n<@U123ABC>");
+    expect(memberList.visibility).toBe("ephemeral");
   });
 });
